@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>NOCTIS // BOOT SEQUENCE</title>
+<style>
+  :root {
+    /* Purple + hot pink palette */
+    --bg: #110016;         /* deep wine-purple */
+    --bg-2: #1b0626;       /* panel tint */
+    --fg: #ff3fb5;         /* hot pink for text */
+    --dim: #b589ff;        /* soft lavender for secondary */
+    --warn: #ff6b8a;       /* warm pink-red for warnings */
+    --accent: #8d3bff;     /* electric violet accents */
+    --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  }
+  html, body {
+    margin: 0; height: 100%;
+    background: radial-gradient(ellipse at center, var(--bg-2) 0%, var(--bg) 60%);
+    color: var(--fg); font-family: var(--mono);
+    overflow: hidden;
+  }
+  /* CRT vibe */
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(255,255,255,0) 0px,
+      rgba(255,255,255,0) 2px,
+      rgba(255,255,255,0.06) 3px
+    );
+    mix-blend-mode: overlay; pointer-events: none;
+  }
+  body::after {
+    content: "";
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse at center, rgba(255,63,181,0.06), rgba(0,0,0,0.3) 60%);
+    pointer-events: none;
+  }
+  .container { padding: 18px 20px; height: 100%; box-sizing: border-box; }
+  .terminal {
+    height: 100%; overflow: hidden; white-space: pre-wrap; line-height: 1.25; font-size: 15px;
+  }
+  .type { display: inline; }
+  .cursor { display: inline-block; width: 8px; margin-left: 4px; background: var(--fg); animation: blink 1s step-end infinite; }
+  @keyframes blink { 50% { background: transparent; } }
+
+  .dim { color: var(--dim); }
+  .warn { color: var(--warn); }
+  .ok { color: var(--fg); }
+
+  .line { opacity: 0; transform: translateY(4px); animation: appear .28s ease forwards; }
+  @keyframes appear { to { opacity: 1; transform: translateY(0); } }
+
+  /* puzzle UI */
+  .input-row { margin-top: 12px; }
+  input[type="text"] {
+    background: rgba(255,255,255,0.02); border: 1px solid var(--dim); color: var(--fg); padding: 8px 10px; width: min(560px, 90vw);
+    outline: none; font: 15px var(--mono);
+    box-shadow: 0 0 12px rgba(141,59,255,0.12) inset;
+  }
+  button {
+    background: rgba(141,59,255,0.07); border: 1px solid var(--fg); color: var(--fg); padding: 8px 12px; margin-left: 8px;
+    font: 15px var(--mono); cursor: pointer;
+    box-shadow: 0 0 10px rgba(255,63,181,0.15) inset;
+  }
+  button:hover { background: rgba(255,63,181,0.10); }
+
+  /* marquee & ascii */
+  .marquee {
+    position: fixed; left: 0; right: 0; bottom: 0; height: 26px; overflow: hidden;
+    border-top: 1px solid var(--accent); background: rgba(141,59,255,0.12);
+  }
+  .marquee span {
+    position: absolute; white-space: nowrap; will-change: transform;
+    animation: scroll 12s linear infinite;
+  }
+  @keyframes scroll { from { transform: translateX(100%);} to { transform: translateX(-100%);} }
+
+  .ascii {
+    position: fixed; right: 12px; top: 12px; text-align: right; opacity: 0.7; pointer-events: none;
+    text-shadow: 0 0 6px rgba(255,63,181,0.4);
+  }
+
+  .hint { margin-top: 6px; color: var(--dim); }
+  .note { position: fixed; top: 8px; left: 12px; color: var(--dim); opacity: 0.8; }
+
+  /* violent shake (triggered briefly) */
+  .shake {
+    animation: violentShake 0.5s linear;
+  }
+  @keyframes violentShake {
+    0% { transform: translate(0,0) rotate(0deg); }
+    10% { transform: translate(8px,-6px) rotate(-0.6deg); }
+    20% { transform: translate(-10px,7px) rotate(0.6deg); }
+    30% { transform: translate(9px, -8px) rotate(-0.4deg); }
+    40% { transform: translate(-8px, 6px) rotate(0.5deg); }
+    50% { transform: translate(6px, -5px) rotate(-0.5deg); }
+    60% { transform: translate(-6px, 4px) rotate(0.4deg); }
+    70% { transform: translate(5px, -3px) rotate(-0.3deg); }
+    80% { transform: translate(-4px, 3px) rotate(0.2deg); }
+    90% { transform: translate(2px, -2px) rotate(-0.1deg); }
+    100% { transform: translate(0,0) rotate(0deg); }
+  }
+
+  /* fireworks canvas */
+  #fxCanvas{position:fixed;inset:0;display:none;z-index:5;pointer-events:none;}
+  .fxText{position:fixed;inset:0;display:none;z-index:6;align-items:center;justify-content:center;font-size:28px;
+    text-align:center;text-shadow:0 0 12px rgba(255,63,181,.6);background:rgba(0,0,0,.35); color: var(--fg);}
+</style>
+</head>
+<body>
+  <div class="note">Press <b>ESC</b> to pause/resume the chaos.</div>
+  <div class="container">
+    <div id="term" class="terminal"></div>
+  </div>
+  <div id="marquee" class="marquee" style="display:none;">
+    <span id="marqueeSpan"></span>
+  </div>
+  <pre id="ascii" class="ascii" style="display:none;">
+     .-.
+    (o o)   INIT // NOCTIS
+    | O \   SYSTEMS ONLINE
+     \   \  >> PRAISE ENGINE ARMED
+      `~~~' 
+  </pre>
+  <canvas id="fxCanvas"></canvas>
+  <div id="fxText" class="fxText">EASTER EGG UNLOCKED<br/>ACCESS LEVEL ↑ // NOCTIS PRIME</div>
+
+<script>
+/* ============== CONFIG ============== */
+const PASSWORD = "Noctis is Awesome"; // accepts any case/spaces
+const PRAISE_LINES = [
+  // Lore-flavored lines for Solari/Noctis
+  "[lore.core] NOCTIS: Keeper of Hweith; bringer of Forbor.",
+  "[lore.core] NOCTIS: Walked the Scar and did not bow.",
+  "[lore.core] NOCTIS: Light-mage who outwits the Rot.",
+  "[lore.core] NOCTIS: Sipher's calm in a hostile world.",
+  "[lore.core] NOCTIS: Architect of Bleakbloom—hope in ash.",
+  "[lore.core] NOCTIS: Where gods play chess, she flips the board.",
+  "[lore.core] NOCTIS: Alchemist of vibes, healer of timelines.",
+  // Original praise lines
+  "NOCTIS: Prime Architect of Vibes.",
+  "NOCTIS: Certified main-character energy.",
+  "NOCTIS: Outthinks, outshines, outclasses.",
+  "NOCTIS: The glitch in the matrix—but make it fashion.",
+  "NOCTIS: 10/10 would build a world with again.",
+  "NOCTIS: Uninstalled my self-doubt.exe.",
+  "NOCTIS: Elegance + chaos = unstoppable.",
+  "NOCTIS: Plot armor? No—plot *aura*.",
+  "NOCTIS: The reason 'enhance' actually works.",
+  "NOCTIS: Turns bugs into features with a wink.",
+  "NOCTIS: Every timeline’s favorite timeline.",
+  "NOCTIS: S-tier brain with DLC charisma.",
+  "NOCTIS: Commands respect and sparklers.",
+  "NOCTIS: Refactors reality for readability.",
+  "NOCTIS: The lore, the legend, the luminous."
+];
+/* ==================================== */
+
+const term = document.getElementById('term');
+
+function printLine(text = "", cls = "") {
+  const div = document.createElement('div');
+  div.className = "line " + cls;
+  div.textContent = text;
+  term.appendChild(div);
+  term.scrollTop = term.scrollHeight;
+}
+
+function typeLine(text, cls = "", speed = 12) {
+  return new Promise(resolve => {
+    const div = document.createElement('div');
+    div.className = "line " + cls;
+    const span = document.createElement('span');
+    span.className = 'type';
+    div.appendChild(span);
+    const cursor = document.createElement('span');
+    cursor.className = 'cursor';
+    div.appendChild(cursor);
+    term.appendChild(div);
+
+    let i = 0;
+    const tick = () => {
+      span.textContent = text.slice(0, i++);
+      term.scrollTop = term.scrollHeight;
+      if (i <= text.length) {
+        setTimeout(tick, speed);
+      } else {
+        cursor.remove();
+        resolve();
+      }
+    };
+    tick();
+  });
+}
+
+async function bootSequence() {
+  await typeLine("NOCTIS-OS v3.9.88 (build █████)", "ok");
+  await typeLine("Initializing subsystems...", "dim");
+  await delay(200);
+  await typeLine("[ OK ] CORE ▸ memory-map ▸ aligned", "ok");
+  await typeLine("[ OK ] IO   ▸ device-graph ▸ mounted", "ok");
+  await typeLine("[ OK ] NET  ▸ loopback ▸ online", "ok");
+  await typeLine("[ OK ] GPU  ▸ shader-plex ▸ calibrated", "ok");
+  await typeLine("Loading personality kernel ▸ CONS…", "dim");
+  await delay(400);
+  await typeLine("[ OK ] CONS ▸ charisma.dll ▸ injected", "ok");
+  await typeLine("[ OK ] CONS ▸ sass.so ▸ linked", "ok");
+  await typeLine("[ OK ] CONS ▸ affection.core ▸ warm", "ok");
+  await delay(350);
+  await typeLine("SECURITY GATE ▸ ACCESS REQUIRED", "warn");
+  await typeLine("Challenge: Say the obvious passphrase.", "dim");
+  await typeLine("Hint ▸ Three words. Format: N_____ is A______ (it's literally the truth).", "dim");
+  printPuzzle();
+}
+
+function normalize(s){ return (s||"").replace(/\s+/g,' ').trim().toLowerCase(); }
+
+function printPuzzle() {
+  const box = document.createElement('div');
+  box.className = "line";
+  const label = document.createElement('div');
+  label.textContent = "Enter passphrase:";
+  box.appendChild(label);
+
+  const row = document.createElement('div'); row.className = "input-row";
+  const input = document.createElement('input'); input.type = "text"; input.placeholder = "Type here...";
+  const btn = document.createElement('button'); btn.textContent = "UNLOCK";
+  row.appendChild(input); row.appendChild(btn);
+
+  const hint = document.createElement('div'); hint.className = "hint";
+  hint.textContent = "Bonus hint: It starts with 'Noctis' and ends with 'Awesome'.";
+  box.appendChild(row); box.appendChild(hint);
+  term.appendChild(box);
+  term.scrollTop = term.scrollHeight;
+
+  const submit = () => {
+    const val = normalize(input.value);
+    if (val === normalize(PASSWORD)) {
+      accessGranted();
+    } else {
+      printLine("[ FAIL ] Close… be honest about Noctis and try again.", "warn");
+      input.focus();
+    }
+  };
+  btn.addEventListener('click', submit);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+  input.focus();
+}
+
+async function accessGranted() {
+  await typeLine("[ OK ] PASS ▸ accepted", "ok");
+  await delay(250);
+  await typeLine("Arming praise-engine ▸ █████████ 99%", "dim");
+  await delay(300);
+  await typeLine("Deploying payload ▸ ‘OPULENT-ADORATION’", "dim");
+  await delay(300);
+  unleashChaos();
+}
+
+/* ===== CHAOS MODE ===== */
+let chaosTimerA = null, chaosTimerB = null, chaosPaused = false, rewardTimer = null, shakeTimer = null;
+
+function unleashChaos() {
+  document.getElementById('ascii').style.display = 'block';
+  const marquee = document.getElementById('marquee');
+  const marqueeSpan = document.getElementById('marqueeSpan');
+  marquee.style.display = 'block';
+  marqueeSpan.textContent = "SYSTEM MESSAGE: NOCTIS IS AWESOME • ACCESS GRANTED • ELEVATING PERMISSIONS • INIT PRAISE ENGINE • ";
+
+  printLine(">>> EXECUTING PRAISE ENGINE …", "ok");
+  startSpam();
+  rewardTimer = setTimeout(launchReward, 30000);
+  scheduleShake(); // start random violent shakes
+}
+
+function startSpam() {
+  // Restore fast pace
+  chaosTimerA = setInterval(() => {
+    const msg = randomPraise();
+    const now = new Date().toLocaleTimeString();
+    printLine(`${now} ▸ ${msg}`);
+    if (term.childElementCount > 500) {
+      while (term.childElementCount > 400) term.removeChild(term.firstChild);
+    }
+  }, 90);
+
+  // Progress/warnings
+  chaosTimerB = setInterval(() => {
+    const r = Math.random();
+    if (r < 0.33) {
+      printLine("[ WARN ] Compliment buffer near capacity. Spilling over in style.", "warn");
+    } else if (r < 0.66) {
+      const pct = (80 + Math.random()*20).toFixed(2);
+      printLine(`PRAISE-UPLINK: saturating at ${pct}% ▸ rerouting via admiration-tunnels`, "dim");
+    } else {
+      printLine(">>> NOCTIS kernel: converting envy to inspiration… OK", "ok");
+    }
+  }, 900);
+}
+
+function randomPraise() {
+  const base = PRAISE_LINES[Math.floor(Math.random()*PRAISE_LINES.length)];
+  const mod = ["[ai.core]", "[shader.fx]", "[net.bus]", "[sys.mem]", "[glow.dll]", "[pulse.so]", "[lore.bus]"];
+  return `${mod[Math.floor(Math.random()*mod.length)]} ${base}`;
+}
+
+// ESC to pause/resume
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    chaosPaused = !chaosPaused;
+    if (chaosPaused) {
+      clearInterval(chaosTimerA); clearInterval(chaosTimerB);
+      printLine("|| PAUSED || Press ESC to resume.", "warn");
+    } else {
+      printLine("|| RESUME || Praise stream continuing.", "ok");
+      startSpam();
+    }
+  }
+});
+
+/* ===== REWARD: FIREWORKS ===== */
+const fxCanvas = document.getElementById('fxCanvas');
+const fxText = document.getElementById('fxText');
+let ctx, W, H, particles=[];
+function resize(){ W=fxCanvas.width=window.innerWidth; H=fxCanvas.height=window.innerHeight; }
+window.addEventListener('resize', resize);
+
+function launchReward(){
+  resize(); fxCanvas.style.display='block'; fxText.style.display='flex';
+  if(!ctx) ctx=fxCanvas.getContext('2d');
+  let t0=null;
+  const spawn=()=>{ // burst of particles
+    const x=Math.random()*W, y=Math.random()*H*0.6+H*0.1;
+    for(let i=0;i<80;i++){
+      particles.push({
+        x, y, vx:(Math.random()-0.5)*6, vy:(Math.random()-0.8)*6-2,
+        life: 60+Math.random()*30, age:0
+      });
+    }
+  };
+  const draw=(ts)=>{
+    if(!t0) t0=ts;
+    ctx.clearRect(0,0,W,H);
+    if(Math.random()<0.08) spawn();
+    particles = particles.filter(p=>{
+      p.x+=p.vx; p.y+=p.vy; p.vy+=0.05; p.age++;
+      const alpha=Math.max(0, 1 - p.age/p.life);
+      ctx.globalAlpha=alpha; ctx.fillRect(p.x, p.y, 2, 2);
+      return p.age<p.life;
+    });
+    ctx.globalAlpha=1;
+    if(ts-t0<10000){ requestAnimationFrame(draw); } // ~10s
+    else { fxCanvas.style.display='none'; fxText.style.display='none'; }
+  };
+  ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--fg').trim() || '#ff3fb5';
+  requestAnimationFrame(draw);
+}
+
+/* ===== RANDOM VIOLENT SHAKE ===== */
+function scheduleShake(){
+  const next = 7000 + Math.random()*8000; // every ~7–15s
+  shakeTimer = setTimeout(()=>{
+    document.body.classList.add('shake');
+    setTimeout(()=>{
+      document.body.classList.remove('shake');
+      scheduleShake();
+    }, 500); // 0.5s burst
+  }, next);
+}
+
+/* utils */
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+/* init */
+bootSequence();
+</script>
+</body>
+</html>
